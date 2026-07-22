@@ -35,13 +35,6 @@ var (
 //
 //go:linkname Init runtime/goos.Hwinit1
 func Init() {
-	// DEBUG breadcrumb 'E': reached Hwinit1 — this runs AFTER the runtime's
-	// Hwinit0 (arm64 InitMMU, which enables the MMU + I/D caches) and after the
-	// Go world has started (so atomics/scheduler work). If 'E' prints, the MMU
-	// and cache enable survived; if it does not, execution died in InitMMU
-	// (uninvalidated reset cache lines on real silicon).
-	ast2700.UART12.Tx('E')
 	ast2700.Init()
 	ast2700.UART12.Init()
-	ast2700.UART12.Tx('F')
 }
