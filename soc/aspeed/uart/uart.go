@@ -95,3 +95,15 @@ func (u *UART) Write(b []byte) {
 		u.Tx(c)
 	}
 }
+
+// Rx receives a single byte. The boolean result is false when no received data
+// is pending (LSR receive-data-ready bit clear), so callers can poll without
+// blocking. A blocking reader can be built on top of Rx by yielding between
+// polls; that adapter is intentionally left to the caller to keep this driver
+// free of scheduler assumptions.
+func (u *UART) Rx() (byte, bool) {
+	if reg.Read(u.Base+lsr)&lsrRxReady == 0 {
+		return 0, false
+	}
+	return byte(reg.Read(u.Base + rbrThr)), true
+}
