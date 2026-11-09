@@ -13,18 +13,17 @@ package ast2500evb
 import (
 	_ "unsafe"
 
-	"github.com/usbarmory/tamago/internal/reg"
 	"github.com/usbarmory/tamago/soc/aspeed/ast2500"
 )
 
-// printk routes single-byte runtime console output to UART5.
-// Writes directly to THR without checking LSR so that early panics
-// (before UART5.Init()) still produce output.
+// printk routes runtime console output to UART5, waiting for its
+// transmitter, with a carriage return before each line feed.
 //
 //go:linkname printk runtime/goos.Printk
 func printk(c byte) {
 	if c == '\n' {
-		reg.Write(ast2500.UART5_BASE, uint32('\r'))
+		ast2500.UART5.Tx('\r')
 	}
-	reg.Write(ast2500.UART5_BASE, uint32(c))
+
+	ast2500.UART5.Tx(c)
 }
