@@ -9,6 +9,7 @@
 package arm
 
 import (
+	"runtime"
 	"runtime/goos"
 	"unsafe"
 
@@ -42,6 +43,7 @@ const (
 )
 
 // defined in exception.s or exception_v5.s (see build constraints)
+func read_spsr() uint32
 func set_exc_stack(addr uint32)
 func set_vbar(addr uint32)
 func set_mvbar(addr uint32)
@@ -58,7 +60,51 @@ var (
 	offset     int
 	eip        uintptr
 	isThrowing bool
+
+	// excG is the g register (R10) of the interrupted context, zero
+	// before the runtime installs one.
+	excG uint32
+	// excMode is the processor mode the exception was taken to.
+	excMode int
+	// inject has the exception vector resume the interrupted goroutine
+	// in exceptionPanic once the system exception handler returns.
+	inject bool
+	// injectLR, when not zero, replaces the interrupted link register
+	// for exceptionPanic.
+	injectLR uintptr
 )
+
+// CPSR/SPSR mode and Thumb state bits
+const (
+	psrModeMask = 0x1f
+	psrThumb    = 1 << 5
+)
+
+const (
+	// Go ARM prologue saving the link register: str lr, [sp, #-n]!
+	pushLR     = 0xe52de000
+	pushLRMask = 0xfffff000
+	// prologue instructions searched for pushLR
+	prologueLen = 8
+)
+
+// linkSaved reports whether the function executing pc pushed its link
+// register, and with it moved the stack pointer, before reaching pc.
+func linkSaved(pc uintptr) bool {
+	fn := runtime.FuncForPC(pc)
+
+	if fn == nil {
+		return false
+	}
+
+	for p := fn.Entry(); p < pc && p < fn.Entry()+4*prologueLen; p += 4 {
+		if reg.Read(uint32(p))&pushLRMask == pushLR {
+			return true
+		}
+	}
+
+	return false
+}
 
 type ExceptionHandler func()
 
@@ -76,17 +122,54 @@ type VectorTable struct {
 	FIQ           ExceptionHandler
 }
 
-// DefaultExceptionHandler handles an exception by printing its vector and
-// processor mode before panicking.
+// DefaultExceptionHandler handles an exception by panicking on the
+// interrupted goroutine, as if its faulting instruction had called a function
+// that panics: the panic then unwinds that goroutine's stack, running its
+// deferred calls, and recover works as for any panic.
+//
+// An exception taken outside of a goroutine (in another exception mode,
+// before the runtime starts or in Thumb state) has no stack to unwind: its
+// vector, processor mode and location are printed before halting.
 func DefaultExceptionHandler() {
 	if isThrowing {
 		goos.Exit(1)
 	}
 
+	excMode = int(read_cpsr() & psrModeMask)
+	spsr := read_spsr()
+
+	if spsr&psrModeMask == SYS_MODE && spsr&psrThumb == 0 && excG != 0 {
+		// Once the faulting function saved its return address,
+		// exceptionPanic appears called by the faulting instruction.
+		// Before, or in a leaf function, its caller's frame is still
+		// current: exceptionPanic appears called from there.
+		injectLR = 0
+
+		if linkSaved(eip) {
+			injectLR = eip
+		}
+
+		inject = true
+		return
+	}
+
 	isThrowing = true
 
-	print("exception: vector ", offset, " mode ", int(read_cpsr()&0x1f), "\n")
-	exception.Throw(eip)
+	print("exception: vector ", offset, " mode ", excMode, " from mode ", int(spsr&psrModeMask), "\n")
+	exception.Print(eip)
+	goos.Exit(1)
+}
+
+// exceptionPanic runs on the interrupted goroutine, entered from the exception
+// vector with a return address that continues the goroutine's traceback:
+// the faulting instruction, or its caller's call site (see
+// DefaultExceptionHandler).
+//
+//go:noinline
+func exceptionPanic() {
+	print("exception: vector ", offset, " mode ", excMode, "\n")
+	exception.Print(eip)
+	panic("unhandled exception: " + VectorName(offset))
 }
 
 // SystemExceptionHandler allows to override the default exception handler

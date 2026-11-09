@@ -42,6 +42,12 @@ TEXT ·set_exc_stack(SB),NOSPLIT,$0-4
 
 	RET
 
+// func read_spsr() uint32
+TEXT ·read_spsr(SB),NOSPLIT,$0-4
+	WORD	$0xe14f0000 // mrs r0, SPSR
+	MOVW	R0, ret+0(FP)
+	RET
+
 // func set_vbar(addr uint32)
 TEXT ·set_vbar(SB),NOSPLIT,$0-4
 	MOVW	addr+0(FP), R0
@@ -64,10 +70,40 @@ TEXT ·set_mvbar(SB),NOSPLIT,$0-4
 	SUB	$LROFFSET, R14, R14				\
 	MOVW	R14, ·eip(SB)					\
 								\
+	/* save the interrupted goroutine */			\
+	MOVW	g, ·excG(SB)					\
+								\
 	/* call exception handler on system stack (g0) */	\
 	MOVW	FN(SB), R0					\
 	MOVW	R0, 4(R13)					\
-	CALL	runtime·CallOnG0(SB)
+	CALL	runtime·CallOnG0(SB)				\
+	B	·resumeException(SB)
+
+// resumeException runs when the system exception handler returns. When it
+// asked for it, the interrupted System mode goroutine resumes in
+// exceptionPanic, its link register set to injectLR unless that is zero, as
+// if exceptionPanic had been called there: the goroutine's own stack then
+// unwinds the panic. Otherwise the CPU halts.
+TEXT ·resumeException(SB),NOSPLIT|NOFRAME,$0
+	MOVB	·inject(SB), R0
+	CMP	$0, R0
+	B.EQ	halt
+	MOVW	$0, R0
+	MOVB	R0, ·inject(SB)
+
+	MOVW	·injectLR(SB), R0
+	CMP	$0, R0
+	B.EQ	resume
+	WORD	$0xe10f1000	// mrs r1, CPSR
+	WORD	$0xe321f0df	// msr CPSR_c, 0xdf (System mode, IRQ/FIQ masked)
+	MOVW	R0, R14
+	WORD	$0xe121f001	// msr CPSR_c, r1 (back to the exception mode)
+resume:
+
+	MOVW	$·exceptionPanic(SB), R14
+	MOVW.S	R14, R15	// return to System mode, restoring CPSR from SPSR
+halt:
+	B	·exit(SB)
 
 TEXT ·resetHandler(SB),NOSPLIT|NOFRAME,$0
 	EXCEPTION(const_RESET, ·SystemExceptionHandler, 0)

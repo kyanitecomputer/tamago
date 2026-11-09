@@ -7,12 +7,40 @@
 
 package exception
 
-import "runtime"
+import (
+	"runtime"
+	"unsafe"
+)
 
-func Throw(pc uintptr) {
+// Print prints the source location of pc.
+func Print(pc uintptr) {
 	fn := runtime.FuncForPC(pc)
-	file, line := fn.FileLine(pc)
 
+	if fn == nil {
+		print("\tpc=")
+		printHex(pc)
+		print("\n")
+		return
+	}
+
+	file, line := fn.FileLine(pc)
 	print("\t", file, ":", line, "\n")
+}
+
+// Throw prints the source location of pc and panics.
+func Throw(pc uintptr) {
+	Print(pc)
 	panic("unhandled exception")
+}
+
+// printHex prints v in hexadecimal without allocating.
+func printHex(v uintptr) {
+	const digits = "0123456789abcdef"
+
+	print("0x")
+
+	for shift := int(8*unsafe.Sizeof(v)) - 4; shift >= 0; shift -= 4 {
+		n := (v >> shift) & 0xf
+		print(digits[n : n+1])
+	}
 }
