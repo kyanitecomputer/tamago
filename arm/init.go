@@ -14,6 +14,11 @@ import (
 	_ "unsafe"
 )
 
+// goarmsoftfp is set by the linker when GOARM includes the softfloat option.
+//
+//go:linkname goarmsoftfp runtime.goarmsoftfp
+var goarmsoftfp uint8
+
 // Init takes care of the lower level initialization triggered before runtime
 // setup (pre World start).
 //
@@ -21,6 +26,12 @@ import (
 func Init() {
 	if int(read_cpsr()&0x1f) != SYS_MODE {
 		// initialization required only when in PL1
+		return
+	}
+
+	// softfloat builds issue no VFP instructions, the VFP is left disabled
+	// as it might not be present (e.g. ARM1176JZ-S).
+	if goarmsoftfp != 0 {
 		return
 	}
 
