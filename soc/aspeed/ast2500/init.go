@@ -30,7 +30,7 @@ func Model() string {
 		return "AST2500 A0"
 	case 0x01:
 		return "AST2500 A1"
-	case 0x02:
+	case 0x03:
 		return "AST2500 A2"
 	default:
 		return "AST2500 unknown"
