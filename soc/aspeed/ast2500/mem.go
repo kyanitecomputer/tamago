@@ -12,15 +12,8 @@ package ast2500
 
 import _ "unsafe"
 
-// SDRAM base for AST2500. Canonical physical address is 0x80000000.
-// The ASPEED boot ROM may remap SDRAM to 0x00000000 via AHBC8C[0], but
-// TamaGo uses the canonical 0x80000000 base so that:
-//   - QEMU loading with -kernel places the ELF in real SDRAM
-//   - The stack lands in valid SDRAM (0x9FF00000 for 512 MB)
-// On real hardware the EarlyInit sets the AHBC remap so that exception
-// vectors installed at 0x0 (by cpuinit.s) in remapped SDRAM are accessible.
-// The arm.CPU struct has NoVBAR=true so VBAR is not written; the LDR PC table
-// written by initVectorTable goes to RamStart (0x80000000 in SDRAM).
+// SDRAM base for AST2500. The exception vector table, which VBAR points
+// at, and the exception stack live at its start.
 //
 //go:linkname ramStart runtime/goos.RamStart
 var ramStart uint32 = 0x80000000

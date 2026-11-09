@@ -49,12 +49,8 @@ func Init() {
 	// MMU deferred: ARM.InitMMU() can be added when exception handling works.
 
 	VIC.Init()
-	// Note: ARM.EnableInterrupts() is NOT called here because the ARM hardware
-	// exception vectors (fixed at 0x0 for NoVBAR=true) need to point to Go's
-	// IRQ handlers before interrupts can be safely enabled. On real hardware
-	// after AHBC remap, arm.Init() would write LDR PC table to 0x0 (remapped
-	// SDRAM). On QEMU where AHBC remap is not implemented, enabling IRQs would
-	// cause faults. Applications call arm.ServiceInterrupts() when ready.
+	// Interrupts stay masked: applications call arm.ServiceInterrupts()
+	// to handle them.
 
 	EnableUART5Clock()
 	initTimers()

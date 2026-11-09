@@ -12,8 +12,7 @@ package ast2500evb
 
 import _ "unsafe"
 
-// The AST2500EVB has 512 MB DDR3 SDRAM. After boot ROM SDRAM remap,
-// memory starts at 0x00000000 (aliased from 0x80000000 canonical).
+// The AST2500EVB has 512 MB DDR3 SDRAM at 0x80000000.
 
 //go:linkname ramSize runtime/goos.RamSize
 var ramSize uint32 = 0x20000000 // 512 MB

@@ -23,7 +23,7 @@ func main() {
 	fmt.Printf("Board   : AST2500EVB\n")
 	fmt.Printf("SoC     : %s\n", ast2500.Model())
 	fmt.Printf("CPU     : ARM1176JZS\n")
-	fmt.Printf("RAM     : 512 MB @ 0x80000000 (remapped to 0x0)\n")
+	fmt.Printf("RAM     : 512 MB @ 0x80000000\n")
 
 	for i := 0; ; i++ {
 		fmt.Printf("tick %d\n", i)

@@ -11,16 +11,15 @@
 //
 // Build with:
 //
-//	GOOS=tamago GOARCH=arm GOARM=6,softfloat \
+//	GOOS=tamago GOARCH=arm GOARM=5 \
 //	  go tool tamago build \
-//	    -tags linkcpuinit,softfloat \
+//	    -tags linkcpuinit \
 //	    -ldflags "-T 0x80010000 -R 0x1000" \
 //	    ./cmd/myapp
 //
-// The linker text base is 0x80010000 (canonical SDRAM) so QEMU can load the
-// ELF into physical SDRAM. cpuinit.s then sets AHBC8C[0]=1 to remap SDRAM
-// to 0x00000000; goos.RamStart=0x0 so exception vectors and the Go heap use
-// the 0x0-aliased SDRAM. Both 0x0 and 0x80000000 address the same memory.
+// The linker text base is 0x80010000 (SDRAM, goos.RamStart = 0x80000000) so
+// QEMU can load the ELF into physical SDRAM. VBAR points the exception
+// vectors at RamStart.
 //
 // This package is only meant to be used with `GOOS=tamago GOARCH=arm` as
 // supported by the TamaGo framework for bare metal Go, see
@@ -57,7 +56,6 @@ func Init() {
 	ast2500.Init()
 	ast2500.UART5.Init()
 	// Timer2 IRQ is configured by initTimers() but not enabled in the VIC here.
-	// Enable it from application code after arm.ServiceInterrupts is running
-	// and exception vector handling at 0x0 is confirmed working on the target.
+	// Enable it from application code after arm.ServiceInterrupts is running.
 	// ast2500.VIC.EnableIRQ(ast2500.TIMER2_IRQ)
 }

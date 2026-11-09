@@ -13,16 +13,19 @@
 // adopting the following reference specifications:
 //   - AST2500/AST2520 A2 Datasheet v1.8 (Jul 2020)
 //
-// The ASPEED boot ROM remaps SDRAM to 0x00000000 before jumping to the
-// loaded image; goos.RamStart = 0x0 and the linker text base is 0x00010000.
+// A loader initializes SDRAM, which starts at goos.RamStart = 0x80000000,
+// and enters the image there; the linker text base is 0x80010000. The
+// ARM1176JZS implements the Security Extensions and with them VBAR, which
+// arm.CPU.Init points at RamStart: address 0 stays the SPI flash.
 //
 // Build with:
 //
-//	GOOS=tamago GOARCH=arm GOARM=6,softfloat
+//	GOOS=tamago GOARCH=arm GOARM=5
 //
-// ARM1176JZS does not implement the VFP floating-point unit; softfloat is
-// mandatory. The NoVBAR field is set because ARM1176 has no VBAR register;
-// exception stubs must be installed at 0x00000000 by cpuinit.s.
+// With the MMU off, ARMv6 LDREX/STREX need a global exclusive monitor, which
+// the AST2500 lacks: a GOARM=6 image hangs in its first atomic operation.
+// GOARM=5 selects single-processor atomics and the soft-float ABI; the
+// ARM1176JZS has no VFP unit either.
 //
 // This package is only meant to be used with `GOOS=tamago GOARCH=arm` as
 // supported by the TamaGo framework for bare metal Go, see
